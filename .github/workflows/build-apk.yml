@@ -6,25 +6,53 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Layiheni yukle
+        uses: actions/checkout@v4
+
       - name: ZIP faylini ac
-        run: unzip -o Android_Tetbiq_Kilidi_Yeni.zip
-      - uses: actions/setup-java@v4
+        run: |
+          unzip -q -o Android_Tetbiq_Kilidi_Yeni.zip
+          test -f settings.gradle
+          test -f app/build.gradle
+
+      - name: Java 17 qurasdir
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-      - name: Android SDK
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
-      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Android SDK qurasdir
+        shell: bash
+        run: |
+          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          TOOL=$(find "$SDK/cmdline-tools" -type f -name sdkmanager | head -n 1)
+          test -x "$TOOL"
+          "$TOOL" --sdk_root="$SDK" "platforms;android-35" "build-tools;35.0.0"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+
+      - name: Gradle 8.9 qurasdir
+        uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: APK yig
-        run: gradle :app:assembleDebug --no-daemon
-      - uses: actions/upload-artifact@v4
+
+      - name: APK hazirla
+        run: gradle :app:assembleDebug --no-daemon --stacktrace
+
+      - name: APK adini deyis
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk TetbiqKilidi-v1.apk
+
+      - name: APK faylini yukle
+        uses: actions/upload-artifact@v4
         with:
           name: TetbiqKilidi-v1-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: TetbiqKilidi-v1.apk
+          if-no-files-found: error
